@@ -30,12 +30,16 @@ class Simulation(object):
             Default: empty list()
         :ivar bool ignoreCase: whether to ignore case in reagants/reactants.
             Default: True
-        :ivar list traj: list of states
+        :ivar list traj: list of states, simulation trajectory
+        :ivar list times: list of times for traj
         """
+        self.tf = tf
         self.setState(state)
         self.setReagants(reagants)
         self.setReactions(reactions)
         self.ignoreCase = ignoreCase
+        self.traj = list()
+        self.times = list()
 
     def setVal(self, reagant, value):
         """
@@ -51,17 +55,6 @@ class Simulation(object):
         except KeyError:
             return False
 
-    @abstractmethod
-    def setState(self, state):
-        """
-        sets the state vector to input list
-        type-checks for list values (e.g. int for discrete, nonnegative float
-        for continuous), so abstract
-        :param list state: input state vector
-        :return: True if passed type checks and set, False otherwise
-        """
-        pass
-
     def setReagants(self, reagants):
         """
         sets the reagants dict
@@ -70,7 +63,7 @@ class Simulation(object):
         :param dict reagants: dict of reagants
         :return: True if set, False if error
         """
-        assert(type(reagants) == dict)
+        assert(isinstance(reagants, dict))
         if len(reagants.values()) == len(state)\
                 and list(set(reagants.values())) == list(range(len(state)))\
                 and list(set(keys)) == list(keys):
@@ -90,17 +83,35 @@ class Simulation(object):
         of reagants and float reaction rate >= 0
         :return: True if set, False if error
         """
-        assert(type(reactions) == list)
+        assert(isinstance(reactions, list))
         for rxn in reactions:
-            if len(rxn) != 3 or type(rxn[2]) != float or rxn[2] < 0:
-                # checking length of tuple and reaction rate
+            if len(rxn) != 3 or not instanceof(rxn[2], float) or rxn[2] < 0\
+                    or not all([i in self.reagants for i in [rxn[0], rxn[1]]]):
+                # checking length of tuple and reaction rate and whether
+                # reagants in self.reagants
                 return False
-            for i in [rxn[0], rxn[1]]:
-                # checking whether reagants in self.reagants
-                if i not in self.reagants:
-                    return False
         self.reactions=reactions
         return True
+
+    def setLen(self, tf):
+        """
+        Sets the termination time for the simulation
+        Checks if nonnegative float
+        :param float tf: final time
+        :return: True if set, False if not
+        """
+        assert(isinstance(tf, float))
+        if tf < 0:
+            return False
+        else:
+            self.tf = tf
+            return True
+
+    def getResults(self):
+        """
+        Fetches simulation trajectory
+        """
+        return self.traj, self.times
 
     @abstractmethod
     def setState(self, state):
@@ -109,13 +120,51 @@ class Simulation(object):
         asserts state is list
         implementations should type-check for list values (e.g. int for
         discrete, nonnegative float for continuous)
+        :param list state: input state vector
+        :return: True if passed type checks and set, False otherwise
         """
-        assert(type(state) == list)
+        assert(isinstance(state, list))
 
     @abstractmethod
     def run(self):
         """
-        all simulations must be able to run
+        Should just run simulation and store results into self.traj, self.times
+        Should be designed such that can modify self.tf and rerun
         """
         pass
-        
+
+class ContinuousSim(Simulation):
+    """
+    Represents a continuous-time simulation of a CRN, uses
+    scipy.integrate.numint to perform numerical integration of mass action
+    equations
+    """
+    def __init__(self, tf,
+            state=list(), 
+            reagants=dict(), 
+            reactions=list(),
+            ignoreCase=True):
+        """
+        Everything handled in super constructor Simulation()
+        """
+        super(ContinuousSim, self).__init__(tf, state, reagants, reactions,
+                ignoreCase)
+
+    def setState(self, state):
+        """
+        sets the state vector to input list
+        asserts state is list, checks nonnegative floats and sets
+        :param list state: input state vector
+        :return: True if passed type checks and set, False otherwise
+        """
+        if super(ContinuousSim, self).setSate(state) and\
+                all([isinstance(i, float) and i >= 0 for i in state]):
+            # checks super (assert is list) and nonnegative float
+            return True
+        return False
+
+    def run(self):
+        """
+        Runs the continuous-time simulation using numint
+        """
+        pass
