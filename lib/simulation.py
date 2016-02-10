@@ -136,6 +136,7 @@ class Simulation(object):
         :param str loc: legend location
         :return: handle to plot, Nonetype if no trajectory to plot
         """
+        plt.style.use('ggplot')
         if self.traj is None:
             return None
         else: # plot traj

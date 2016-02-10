@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 import lib.simulation as sim
 
-s = sim.ContinuousSim(2)
-init = [8, 0]                       # initial state
-reags = {'X':0, 'A': 1}             # reagants/indicies into state vector
-rxns = [(['X'], ['X', 'A'], 0.5),     # ([in], [out], rate) tuples
-        (['A', 'A'], ['A'], 0.5)]
+s = sim.ContinuousSim(30)
+# initial state
+init = [0.6, 0.4, 0]
+# reagants into init vector
+reags = {'X':0, 'Y': 1, 'Z' : 2}
+# reactions
+rxns = [(['X', 'Y'], ['Z', 'Z'], 1),
+        (['X', 'Z'], ['X', 'X'], 1),
+        (['Z', 'Y'], ['Y', 'Y'], 1)]
 
 if s.setState(init) and s.setReagants(reags) and s.setReactions(rxns):
     s.run()
