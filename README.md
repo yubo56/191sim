@@ -12,6 +12,7 @@ List of current features:
 
 List of planned features (in rough order of priority, not necessarily difficulty):
 * Stochastic CRNs
+* Pass to constructor either dict or list for reagants, dynamically parse into dict if list
 * Syntax parser
     * Implement ignoreCase feature (already have flag)
 * Saving simulation object to file

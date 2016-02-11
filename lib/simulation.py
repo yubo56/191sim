@@ -2,11 +2,14 @@
 # class defining a simulation 
 # Changelog:
 #   02/07/16 -- Set up base Simulation abstract class
+#   02/09/16 -- Set up continuous Simulation child class
 
 from abc import ABCMeta, abstractmethod                 # for abstract classes
-from scipy.integrate import odeint
+from scipy.integrate import odeint                      # ODE integrator
+import random                                           # random.random()
 import numpy as np
 import matplotlib.pyplot as plt
+import bisect                                           # binary search
 
 class Simulation(object):
     """
@@ -36,15 +39,15 @@ class Simulation(object):
         :ivar list traj: list of states, simulation trajectory
         :ivar list times: list of times for traj
         """
-        self.tf = tf
-        self.state = state
-        self.reagants = reagants 
-        self.revreag = reagants 
-        self.reactions = reactions
-        self.ignoreCase = ignoreCase
+        self._tf = tf
+        self._state = state
+        self._reagants = reagants 
+        self._revreag = reagants 
+        self._reactions = reactions
+        self._ignoreCase = ignoreCase
 
-        self.traj = None
-        self.times = None
+        self._traj = None
+        self._times = None
         self.setState(state)
         self.setReagants(reagants)
         self.setReactions(reactions)
@@ -58,7 +61,7 @@ class Simulation(object):
             reagant name)
         """
         try:
-            self.state[self.reagants[reagant]] = value
+            self._state[self._reagants[reagant]] = value
             return True
         except KeyError:
             return False
@@ -72,14 +75,14 @@ class Simulation(object):
         :return: True if set, False if error
         """
         assert(isinstance(reagants, dict))
-        if len(reagants.values()) == len(self.state) and\
-            list(set(reagants.values())) == list(range(len(self.state))) and\
+        if len(reagants.values()) == len(self._state) and\
+            list(set(reagants.values())) == list(range(len(self._state))) and\
             len(set(reagants.keys())) == len(reagants.keys()):
-            # right length if len(values) = len(self.state), unique/right values if
-            # set = range(len(self.state)). Then check uniqueness for keys
-            self.reagants = reagants
+            # right length if len(values) = len(self._state), unique/right values if
+            # set = range(len(self._state)). Then check uniqueness for keys
+            self._reagants = reagants
             for i in reagants.keys():
-                self.revreag[reagants[i]] = i
+                self._revreag[reagants[i]] = i
             return True
         else:
             return False
@@ -97,12 +100,12 @@ class Simulation(object):
         for rxn in reactions:
             if len(rxn) != 3 or not (isinstance(rxn[2], float) or\
                     isinstance(rxn[2], int)) or rxn[2] < 0 or\
-                    not all([i in self.reagants for i in rxn[0]]) or\
-                    not all([i in self.reagants for i in rxn[1]]):
+                    not all(map(lambda i : i in self._reagants, rxn[0])) or\
+                    not all(map(lambda i : i in self._reagants, rxn[1])):
                 # checking length of tuple and reaction rate and whether
-                # reagants in self.reagants
+                # reagants in self._reagants
                 return False
-        self.reactions=reactions
+        self._reactions=reactions
         return True
 
     def setLen(self, tf):
@@ -116,14 +119,20 @@ class Simulation(object):
         if tf < 0:
             return False
         else:
-            self.tf = tf
+            self._tf = tf
             return True
 
-    def getResults(self):
+    def getTraj(self):
         """
         Fetches simulation trajectory
         """
-        return self.traj, self.times
+        return self._times, self._traj
+
+    def printTraj(self):
+        """
+        Prints Trajectory and times in pretty print"""
+        for i, j in zip(self._times, np.transpose(self._traj)):
+            print("%s\t%s" % (str(round(i,3)), str(j)))
 
     def plot(self, FN=None, title='Simulation Trajectory', xlabel='Time (s)',
             ylabel='Concentration (M)', loc='best'):
@@ -137,13 +146,13 @@ class Simulation(object):
         :return: handle to plot, Nonetype if no trajectory to plot
         """
         plt.style.use('ggplot')
-        if self.traj is None:
+        if self._traj is None:
             return None
         else: # plot traj
-            for i, traj in enumerate(self.traj):
-                plt.plot(self.times, traj, label=self.revreag[i])
-            plt.axis([self.times.min(), self.times.max(), 0.95 *
-                self.traj.min(), 1.05 * self.traj.max()])
+            for i, traj in enumerate(self._traj):
+                plt.plot(self._times, traj, label=self._revreag[i])
+            plt.axis([self._times.min(), self._times.max(), 0.95 *
+                self._traj.min(), 1.05 * self._traj.max()])
             plt.title(title)
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)
@@ -170,8 +179,8 @@ class Simulation(object):
     @abstractmethod
     def run(self):
         """
-        Should just run simulation and store results into self.traj, self.times
-        Should be designed such that can modify self.tf and rerun
+        Should just run simulation and store results into self._traj, self._times
+        Should be designed such that can modify self._tf and rerun
         """
         pass
 
@@ -195,31 +204,33 @@ class ContinuousSim(Simulation):
     def setState(self, state):
         """
         sets the state vector to input list
-        asserts state is list, checks nonnegative floats and sets
+        asserts state is list, checks nonnegative number (castable to float) and
+        sets state vector
         :param list state: input state vector
         :return: True if passed type checks and set, False otherwise
         """
         try:
             if super(ContinuousSim, self).setState(state) and\
-                    all([i >= 0 for i in state]):
+                    all(map(lambda i:i >= 0, state)):
                 # checks super (assert is list) and nonnegative float
-                self.state = [float(i) for i in state]
+                self._state = list(map(lambda i: float(i), state))
                 return True
             else:
-                print('hi')
                 return False
         except ValueError:
             return False
 
-    def run(self):
+    def run(self, printTraj=False):
         """
         Runs the continuous-time simulation using odeint
         """
-        maxk = max([rxn[2] * len(rxn[0]) * np.sqrt(sum(self.state))
-            for rxn in self.reactions]) # heuristic for 1/max timescale
-        self.times = np.arange(0, self.tf, 1/(10 * maxk))
-        self.traj = np.transpose(odeint(self._ds, self.state, self.times,
-            args=(self.reagants, self.reactions)))
+        maxk = max(map(lambda rxn: rxn[2] * len(rxn[0]) * 
+            np.sqrt(sum(self._state)), self._reactions)) # heuristic timescale
+        self._times = np.arange(0, self._tf, 1/(10 * maxk))
+        self._traj = np.transpose(odeint(self._ds, self._state, self._times,
+            args=(self._reagants, self._reactions)))
+        if printTraj == True:
+            self.printTraj()
 
     @staticmethod
     def _ds(s, t, reagants, reactions):
@@ -236,3 +247,94 @@ class ContinuousSim(Simulation):
             for x in rxn[1]:            # adds to ds (out's)
                 ds[reagants[x]] += rate
         return ds
+
+class StochasticSim(Simulation):
+    """
+    Represents a stochastic CRN, uses first principles to calculate propensities
+    and choose among allowed reactions. No external packages are used to evolve
+    forward in time
+    """
+    def __init__(self, tf,
+            state=list(), 
+            reagants=dict(), 
+            reactions=list(),
+            ignoreCase=True):
+        """
+        Everything handled in super constructor Simulation()
+        """
+        super(StochasticSim, self).__init__(tf, state, reagants, reactions,
+                ignoreCase)
+
+    def setState(self, state):
+        """
+        sets the state vector to input list
+        asserts state is list, checks nonnegative *ints* and sets
+        :param list state: input state vector
+        :return: True if passed type checks and set, False otherwise
+        """
+        try:
+            if super(StochasticSim, self).setState(state) and\
+                    all(map(lambda i:i >= 0, state)) and\
+                    all(map(lambda i:isinstance(i, int), state)):
+                # checks super (assert is list) and nonnegative float
+                self._state = list(state)
+                return True
+            else:
+                return False
+        except ValueError:
+            return False
+
+    def run(self, printTraj=False):
+        """
+        Runs stochastic CRN until tf
+        """
+        t = 0
+        state = list(self._state)
+        traj = list()
+        traj.append(list(state))
+        times = [0]
+        while t < self._tf:
+            dt, rxn = self._nextReaction(state)
+            t += dt
+            if t < self._tf:
+                state = self._doReaction(state, rxn)
+                traj.append(list(state))
+                times.append(t)
+        # no off by one since last reaction doesn't happen
+        self._traj = np.transpose(traj)
+        self._times = np.array(times)
+        if printTraj == True:
+            self.printTraj()
+
+    def _nextReaction(self, state):
+        """
+        Perform a reaction and return time elapsed
+        calculates using propensities
+        :return float, reaction: next time, reaction computed
+            returns float('inf'), None if no reaction possible
+        """
+        props = [(0,None)]              # partial sums of propensities
+        for rxn in self._reactions:
+            prop = rxn[2]
+            for i in rxn[0]:            # multiply by counts of inputs
+                prop *= state[self._reagants[i]]
+            if prop != 0:               # append if nonzero
+                props.append((props[-1][0] + prop, rxn))
+        r = random.random() * props[-1][0]
+        index = bisect.bisect(props, (r, None)) # Need tuple to work
+                                                # in range (0, len - 1)
+        if props[-1][0] == 0:
+            return float('inf'), None
+        else:
+            return random.expovariate(props[-1][0]),\
+                    props[index][1] # time taken
+
+    def _doReaction(self, state, rxn):
+        """
+        helper function to change a state by a reaction
+        """
+        for i in rxn[0]:
+            state[self._reagants[i]] -= 1
+        for i in rxn[1]:
+            state[self._reagants[i]] += 1
+        return state
