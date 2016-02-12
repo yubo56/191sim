@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# 02/12/16 -- example initial stochastic simulation
 import lib.simulation as sim
 
 s = sim.StochasticSim(30)

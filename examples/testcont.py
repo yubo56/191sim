@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# 02/11/16 -- example initial continuous simulation
 import lib.simulation as sim
 
 s = sim.ContinuousSim(30)
