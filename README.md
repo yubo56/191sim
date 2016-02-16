@@ -1,5 +1,7 @@
 # 191sim
-Python implementation of simulations for Caltech class BE/CS191a. 
+Python implementation of simulations for Caltech class BE/CS/CNS/Bi 191a. 
+
+Note: To run examples in `examples/`, run `python -m examples/<file>` or `cp` to root directory of projcet.
 
 Dependencies:
 * Python 3.5.1
@@ -20,3 +22,10 @@ List of planned features (in rough order of priority, not necessarily difficulty
     * Automatically create reagants and set to 0 in add\_reactions?
     * Need incremental mutators rather than just setBLAH
 * Loading/Saving simulation object to file
+* Adaptve Stepsize
+
+Changelog:
+* 02/11/16 -- Set up syntax parser for both reactions and reagants.
+    * Set up stochastic Simulation child class
+* 02/09/16 -- Set up continuous Simulation child class
+* 02/07/16 -- Set up base Simulation abstract class

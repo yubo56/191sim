@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 # class defining a simulation 
 # Changelog:
-#   02/07/16 -- Set up base Simulation abstract class
-#   02/09/16 -- Set up continuous Simulation child class
 #   02/11/16 -- Set up stochastic Simulation child class
+#   02/09/16 -- Set up continuous Simulation child class
+#   02/07/16 -- Set up base Simulation abstract class
 
 from abc import ABCMeta, abstractmethod                 # for abstract classes
 from scipy.integrate import odeint                      # ODE integrator
