@@ -289,22 +289,23 @@ class Simulation(object):
             Whether trajectory has been computed
         """
         ret = ""
-        ret += 'Type\t' + self.__class__.__name__ + '\n'
+        ret += 'Type:\t' + self.__class__.__name__ + '\n'
         ret += "Tf:\t" + str(self._tf) + '\n'
         for i, j in enumerate(self._state):
             ret += self._revreag[i] + ':\t' + str(j) + '\n'
         for rxn in self._reactions:
-            for i in rxn[0]:
-                ret += self._revreag[i] + ' '
-            ret += '-' + str(rxn[2]) + '->'
-            for o in rxn[1]:
-                ret += ' ' + self._revreag[o]
+            for index, i in enumerate(rxn[0]):
+                if index == 0:
+                    ret += self._revreag[i] + ' '
+                else:
+                    ret += '+ ' + self._revreag[i] + ' '
+            ret += '-' + str(rxn[2]) + '-> '
+            for index, i in enumerate(rxn[1]):
+                if index == 0:
+                    ret += self._revreag[i]
+                else:
+                    ret += ' + ' + self._revreag[i]
             ret += '\n'
-        ret += 'Has Trajectory: '
-        if self._traj is None:
-            ret += 'No'
-        else:
-            ret += 'Yes'
         return ret
 
 class ContinuousSim(Simulation):
@@ -463,3 +464,45 @@ class StochasticSim(Simulation):
         for i in rxn[1]:
             state[i] += 1
         return state
+
+def fromFile(f):
+    """
+    given file handle, opens file and reads back in the same formatting as the
+    toString function. Specifically, the following lines are recognized:
+    Type: [ContinuousSim / C] [StochasticSim / S]
+    Reagant: initial concentration
+    Tf: time
+    A + ... -k-> C + ...
+    """
+    simtype = None
+    tf = 0
+    init = list()
+    reags = list()
+    rxns = list()
+    lines = f.readlines()
+    for line in lines:
+        if line.strip() == '':       # if empty line
+            continue
+        elif line.startswith('Type:'): # type line
+            simtype = line.split(':')[1].strip()
+        elif line.startswith('Tf:'): # time line
+            tf = float(line.split(':')[1].strip())
+        elif '>' in line:            # rxn line
+            rxns.append(line)
+        else:                        # should be A:B
+            l = line.split(':')
+            try:
+                reags.append(l[0].strip())
+                init.append(float(l[1].strip()))
+            except IndexError:
+                raise IndexError(line + " is not of form A : B, but expected\
+                reagant, init pair")
+    if simtype == 'ContinuousSim' or simtype == 'C':
+        s = ContinuousSim(tf)
+        s.setAll(init, reags, rxns)
+    elif simtype == 'StochasticSim' or simtype == 'S':
+        s = StochasticSim(tf)
+        s.setAll(init, reags, rxns)
+    else:
+        raise ValueError("Invalid simtype")
+    return s

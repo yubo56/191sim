@@ -15,9 +15,10 @@ List of current features:
     * Print Trajectory
 * Constructor takes either list/list(string) for reagants/reactions instead of dict/list(tuple).
     * Syntax parser for reactions
+* Simulation setups can be toString() and fromFile()
+    * Simulation results are not written to file to save space.
 
 List of planned features (in rough order of priority, not necessarily difficulty):
-* print() function for simulations
 * Enumerator for DSDs
 * Interactive Front End
     * Automatically create reagants and set to 0 in add\_reactions?
