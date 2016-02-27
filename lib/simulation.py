@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import bisect                                           # binary search
 
-def toRxn(rxn):
+def toRxn(rxn, reagants):
     """
     Turns a string reaction into a ([], [], k) form
     String format is "A + B + C -k-> D + E + F$
@@ -31,15 +31,14 @@ class Simulation(object):
     """
     Abstract class, represents a general simulaiton
 
-    Idiomatically, should first setState, then setReagants, then setReactions
+    Should first setState, then setReagants, then setReactions
     """
     __metaclass__ = ABCMeta
 
     def __init__(self, tf,
             state=list(), 
             reagants=dict(), 
-            reactions=list(),
-            ignoreCase=True):
+            reactions=list()):
         """
         :ivar float tf: final time, length of simulation
         :ivar list state: list of quantity of each reagant. indicies are stored
@@ -53,8 +52,6 @@ class Simulation(object):
             as list of 3-tuples, each tuple a pair of lists of in/out reagants
             and a reaction rate
             Default: empty list()
-        :ivar bool ignoreCase: whether to ignore case in reagants/reactants.
-            Default: True
         :ivar list traj: list of states, simulation trajectory
         :ivar list times: list of times for traj
         """
@@ -63,7 +60,6 @@ class Simulation(object):
         self._reagants = dict()
         self._revreag = dict()
         self._reactions = list()
-        self._ignoreCase = ignoreCase
 
         self._traj = None
         self._times = None
@@ -129,17 +125,38 @@ class Simulation(object):
             for index, rxn in enumerate(reactions):
                 if isinstance(rxn, str):
                     try:
-                        rxn = toRxn(rxn) # just convert it and typecheck below
-                        reactions[index] = rxn  # update it for final step
+                        rxn = toRxn(rxn, self._reagants) # parse str syntax
+                        reactions[index] = rxn  # update it for self._reactions
                     except ValueError:
                         return False
-                if len(rxn) != 3 or not (isinstance(rxn[2], float) or\
-                        isinstance(rxn[2], int)) or rxn[2] < 0 or\
-                        not all(map(lambda i : i in self._reagants, rxn[0])) or\
-                        not all(map(lambda i : i in self._reagants, rxn[1])):
-                    # checking length of tuple and reaction rate and whether
-                    # reagants in self._reagants
-                    return False
+                elif isinstance(rxn, tuple):
+                    if len(rxn) != 3: # must be 3-tuple
+                        return False
+                    if not(isinstance(rxn[2], float) or isinstance(rxn[2],
+                        int)): # must be rate constnat
+                        return False
+                    for index, i in enumerate(rxn[0]):
+                        if isinstance(i, str): # if str, set to indicies
+                            try:
+                                rxn[0][index] = self._reagants[i]
+                            except ValueError:
+                                raise ValueError("setReactions got invalid\
+                                reagant")
+                        elif isinstance(i, int): # should be index
+                            if i >= len(self._state):
+                                raise ValueError("setReactions got invalid\
+                                index")
+                    for index, i in enumerate(rxn[1]):
+                        if isinstance(i, str): # if str, set to indicies
+                            try:
+                                rxn[1][index] = self._reagants[i]
+                            except ValueError:
+                                raise ValueError("setReactions got invalid\
+                                reagant")
+                        elif isinstance(i, int): # should be index
+                            if i >= len(self._state):
+                                raise ValueError("setReactions got invalid\
+                                index")
             self._reactions=reactions
             return True
         else:
@@ -261,6 +278,35 @@ class Simulation(object):
         """
         pass
 
+    def toString(self):
+        """
+        Prints out the simulation parameters
+        Format:
+            ClassName
+            Simulation time (tf)
+            [Reagant, initial] pairs
+            Reactions
+            Whether trajectory has been computed
+        """
+        ret = ""
+        ret += 'Type\t' + self.__class__.__name__ + '\n'
+        ret += "Tf:\t" + str(self._tf) + '\n'
+        for i, j in enumerate(self._state):
+            ret += self._revreag[i] + ':\t' + str(j) + '\n'
+        for rxn in self._reactions:
+            for i in rxn[0]:
+                ret += self._revreag[i] + ' '
+            ret += '-' + str(rxn[2]) + '->'
+            for o in rxn[1]:
+                ret += ' ' + self._revreag[o]
+            ret += '\n'
+        ret += 'Has Trajectory: '
+        if self._traj is None:
+            ret += 'No'
+        else:
+            ret += 'Yes'
+        return ret
+
 class ContinuousSim(Simulation):
     """
     Represents a continuous-time simulation of a CRN, uses
@@ -270,13 +316,11 @@ class ContinuousSim(Simulation):
     def __init__(self, tf,
             state=list(), 
             reagants=dict(), 
-            reactions=list(),
-            ignoreCase=True):
+            reactions=list()):
         """
         Everything handled in super constructor Simulation()
         """
-        super(ContinuousSim, self).__init__(tf, state, reagants, reactions,
-                ignoreCase)
+        super(ContinuousSim, self).__init__(tf, state, reagants, reactions)
 
     def setState(self, state):
         """
@@ -319,11 +363,11 @@ class ContinuousSim(Simulation):
         for rxn in reactions:
             rate = rxn[2]
             for x in rxn[0]:            # inputs, calc rate
-                rate *= s[reagants[x]]
+                rate *= s[x]
             for x in rxn[0]:            # subtracts from ds (in's)
-                ds[reagants[x]] -= rate
+                ds[x] -= rate
             for x in rxn[1]:            # adds to ds (out's)
-                ds[reagants[x]] += rate
+                ds[x] += rate
         return ds
 
 class StochasticSim(Simulation):
@@ -335,13 +379,11 @@ class StochasticSim(Simulation):
     def __init__(self, tf,
             state=list(), 
             reagants=dict(), 
-            reactions=list(),
-            ignoreCase=True):
+            reactions=list()):
         """
         Everything handled in super constructor Simulation()
         """
-        super(StochasticSim, self).__init__(tf, state, reagants, reactions,
-                ignoreCase)
+        super(StochasticSim, self).__init__(tf, state, reagants, reactions)
 
     def setState(self, state):
         """
@@ -400,7 +442,7 @@ class StochasticSim(Simulation):
         for rxn in self._reactions:
             prop = rxn[2]
             for i in rxn[0]:            # multiply by counts of inputs
-                prop *= state[self._reagants[i]]
+                prop *= state[i]
             if prop != 0:               # append if nonzero
                 props.append((props[-1][0] + prop, rxn))
         r = random.random() * props[-1][0]
@@ -417,7 +459,7 @@ class StochasticSim(Simulation):
         helper function to change a state by a reaction
         """
         for i in rxn[0]:
-            state[self._reagants[i]] -= 1
+            state[i] -= 1
         for i in rxn[1]:
-            state[self._reagants[i]] += 1
+            state[i] += 1
         return state

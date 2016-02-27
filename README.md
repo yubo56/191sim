@@ -17,8 +17,7 @@ List of current features:
     * Syntax parser for reactions
 
 List of planned features (in rough order of priority, not necessarily difficulty):
-* Fix unnecessary dict lookups (probably slowdowns)
-* Implement ignoreCase feature (already have flag)
+* print() function for simulations
 * Enumerator for DSDs
 * Interactive Front End
     * Automatically create reagants and set to 0 in add\_reactions?
@@ -27,6 +26,7 @@ List of planned features (in rough order of priority, not necessarily difficulty
 * Adaptve Stepsize
 
 Changelog:
+* 02/27/16 -- Removed some unnecessary dict lookups
 * 02/11/16 -- Set up syntax parser for both reactions and reagants.
     * Set up stochastic Simulation child class
 * 02/09/16 -- Set up continuous Simulation child class
