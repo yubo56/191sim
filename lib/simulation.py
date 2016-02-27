@@ -20,8 +20,9 @@ def toRxn(rxn):
     try:
         rxn = rxn.strip().split('-')
         k = float(rxn[1])
-        ins = [i.strip() for i in rxn[0].split('+')]
-        outs = [i.strip() for i in rxn[2][1: ].split('+')]
+        ins = [reagants[i.strip()] for i in rxn[0].split('+')]
+        outs = [reagants[i.strip()]
+                for i in rxn[2][1: ].split('+')] # drop the '->' part
         return (ins, outs, k)
     except ValueError:
         raise ValueError
@@ -44,8 +45,10 @@ class Simulation(object):
         :ivar list state: list of quantity of each reagant. indicies are stored
             in dict reagants. Default: empty list()
         :ivar dict reagants: dict of reagants for the simulation, mapping
-            strr reagant name to int index in state. Default: empty dict()
+            str reagant name to int index in state. Default: empty dict()
             02/11/16 -- added support for passing in list of reagants
+        :ivar dict revreag: dict of indicies for the simulation, mapping
+            int index in state to str reagant name. Default: empty dict()
         :ivar list reactions: list of reactions for the simulation, implemented
             as list of 3-tuples, each tuple a pair of lists of in/out reagants
             and a reaction rate
@@ -143,8 +146,17 @@ class Simulation(object):
             return False
 
     def setAll(self, states, reagants, reactions):
-        return all([self.setState(states), self.setReagants(reagants),
-                self.setReactions(reactions)])
+        if not self.setState(states):
+            print("setState failed!")
+            return False
+        if not self.setReagants(reagants):
+            print("setReagants failed!")
+            return False
+        elif not self.setReactions(reactions):
+            print("setReactions failed!")
+            return False
+        else:
+            return True
 
     def setLen(self, tf):
         """
@@ -301,6 +313,7 @@ class ContinuousSim(Simulation):
     def _ds(s, t, reagants, reactions):
         """
         helper function to compute derivatives
+        takes state s, time t, reagants and reactions
         """
         ds = [0] * len(reagants)   # differential state
         for rxn in reactions:
