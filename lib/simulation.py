@@ -162,11 +162,17 @@ class Simulation(object):
         except TypeError: # usually when tf is not number
             return False
 
-    def getTraj(self):
+    def getTraj(self, select=None):
         """
         Fetches simulation trajectory
         """
-        return self._times, self._traj
+        if select is None:
+            return self._times, self._traj
+        else:
+            traj = list()
+            for i in [self._reagants[sel] for sel in select]:
+                traj.append(self._traj[i])
+            return self._times, traj
 
     def printTraj(self):
         """
@@ -183,6 +189,7 @@ class Simulation(object):
         :param str xlabel: xlabel of graph
         :param str ylabel: ylabel of graph
         :param str loc: legend location
+        :param list select: list of reagant names to selectively plot
         :return: handle to plot, Nonetype if no trajectory to plot
         """
         plt.style.use('ggplot')
@@ -199,7 +206,8 @@ class Simulation(object):
                                 label=self._revreag[i])
                         maxrange = max(self._traj[i].tolist() + [maxrange])
                         minrange = min(self._traj[i].tolist() + [minrange])
-                        print(sel + ': ' + str(self._traj[i][-1]))
+                        print(self._revreag[i] + ': ' + 
+                                str(self._traj[i][-1]))
                 except KeyError:
                     print("Invalid Select! Returning")
                     return None
@@ -221,7 +229,6 @@ class Simulation(object):
             else:
                 plt.savefig(FN)
             plt.clf()
-
 
     @abstractmethod
     def setState(self, state):

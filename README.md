@@ -17,7 +17,9 @@ List of current features:
     * Syntax parser for reactions
 
 List of planned features (in rough order of priority, not necessarily difficulty):
+* Fix unnecessary dict lookups (probably slowdowns)
 * Implement ignoreCase feature (already have flag)
+* Enumerator for DSDs
 * Interactive Front End
     * Automatically create reagants and set to 0 in add\_reactions?
     * Need incremental mutators rather than just setBLAH
