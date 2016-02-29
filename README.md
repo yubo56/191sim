@@ -17,9 +17,13 @@ List of current features:
     * Syntax parser for reactions
 * Simulation setups can be toString() and fromFile()
     * Simulation results are not written to file to save space.
+* Reversible Reactions
+* Subsample for plotting
+    * Python plotting very slow for large lists.
 
 List of planned features (in rough order of priority, not necessarily difficulty):
 * Enumerator for DSDs
+* Better error messages when failure, more edge cases
 * Interactive Front End
     * Automatically create reagants and set to 0 in add\_reactions?
     * Need incremental mutators rather than just setBLAH

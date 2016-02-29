@@ -15,15 +15,24 @@ import bisect                                           # binary search
 def toRxn(rxn, reagants):
     """
     Turns a string reaction into a ([], [], k) form
-    String format is "A + B + C -k-> D + E + F$
+    String format is "A + B + C -k-> D + E + F"
+    Bidirectional format is "A + B + C <-k1/k2-> D + E + F
     """
     try:
         rxn = rxn.strip().split('-')
-        k = float(rxn[1])
-        ins = [reagants[i.strip()] for i in rxn[0].split('+')]
+        # drop '<' if exists
+        ins = [reagants[i.replace('<', "").strip()] for i in rxn[0].split('+')]
         outs = [reagants[i.strip()]
                 for i in rxn[2][1: ].split('+')] # drop the '->' part
-        return (ins, outs, k)
+        if '<' in rxn[0]: # bidirectional
+            ks = rxn[1].split('/')
+            k1 = float(ks[0])
+            k2 = float(ks[1])
+            print(k1, k2)
+            return [(ins, outs, k1), (outs, ins, k2)]
+        else: # unidirectional
+            k1 = float(rxn[1])
+            return [(ins, outs, k1)]
     except ValueError:
         raise ValueError
 
@@ -126,7 +135,9 @@ class Simulation(object):
                 if isinstance(rxn, str):
                     try:
                         rxn = toRxn(rxn, self._reagants) # parse str syntax
-                        reactions[index] = rxn  # update it for self._reactions
+                        reactions[index] = rxn[0]  # update it for self._reactions
+                        for i in range(1, len(rxn)):
+                            reactions.append(rxn[i])
                     except ValueError:
                         return False
                 elif isinstance(rxn, tuple):
@@ -221,6 +232,8 @@ class Simulation(object):
         :param list select: list of reagant names to selectively plot
         :return: handle to plot, Nonetype if no trajectory to plot
         """
+        maxpts = 1000                               # max points to plot
+        plotstep = len(self._times) / maxpts
         plt.style.use('ggplot')
         if self._traj is None:
             return None
@@ -230,9 +243,9 @@ class Simulation(object):
             if select is not None:
                 try:
                     for i in [self._reagants[sel] for sel in select]:
-                        plt.plot(np.append(self._times, self._tf), 
-                                np.append(self._traj[i], self._traj[i][-1]),
-                                label=self._revreag[i])
+                        plt.plot(np.append(self._times[1::plotstep], self._tf), 
+                                np.append(self._traj[i][1::plotstep], 
+                                    self._traj[i][-1]), label=self._revreag[i])
                         maxrange = max(self._traj[i].tolist() + [maxrange])
                         minrange = min(self._traj[i].tolist() + [minrange])
                         print(self._revreag[i] + ': ' + 
@@ -244,15 +257,16 @@ class Simulation(object):
                 maxrange = self._traj.max()
                 minrange = self._traj.min()
                 for i, traj in enumerate(self._traj):
-                    plt.plot(np.append(self._times, self._tf), 
-                            np.append(traj, traj[-1]), label=self._revreag[i])
+                    plt.plot(np.append(self._times[1::plotstep], self._tf), 
+                            np.append(traj[1::plotstep], traj[-1]), 
+                            label=self._revreag[i])
             plt.axis([0, self._tf, 0.95 *
                 minrange, 1.05 * maxrange])
             plt.title(title)
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)
             plt.legend(loc=loc)
-            print("Plotted " + str(len(self._times)) + " points!")
+            print("Plotted " + str(len(self._times[1::plotstep])) + " points!")
             if FN is None:
                 plt.show()
             else:
@@ -473,6 +487,7 @@ def fromFile(f):
     Reagant: initial concentration
     Tf: time
     A + ... -k-> C + ...
+    comment string is '#'
     """
     simtype = None
     tf = 0
@@ -481,11 +496,12 @@ def fromFile(f):
     rxns = list()
     lines = f.readlines()
     for line in lines:
-        if line.strip() == '':       # if empty line
+        if line.strip() == '' or line.strip().startswith('#'):
+            # if empty line or comment
             continue
-        elif line.startswith('Type:'): # type line
+        elif line.startswith('Type'): # type line
             simtype = line.split(':')[1].strip()
-        elif line.startswith('Tf:'): # time line
+        elif line.startswith('Tf'): # time line
             tf = float(line.split(':')[1].strip())
         elif '>' in line:            # rxn line
             rxns.append(line)
@@ -502,7 +518,8 @@ def fromFile(f):
         s.setAll(init, reags, rxns)
     elif simtype == 'StochasticSim' or simtype == 'S':
         s = StochasticSim(tf)
-        s.setAll(init, reags, rxns)
+        s.setAll([int(i) for i in init], reags, rxns)
     else:
         raise ValueError("Invalid simtype")
+    print(tf)
     return s
