@@ -28,10 +28,12 @@ List of planned features (in rough order of priority, not necessarily difficulty
     * Automatically create reagants and set to 0 in add\_reactions?
     * Need incremental mutators rather than just setBLAH
 * Loading/Saving simulation object to file
-* Adaptve Stepsize
+* Adaptive Stepsize
 
 Changelog:
+* 02/29/16 -- Reversibile reactions, subsampled plotting
 * 02/27/16 -- Removed some unnecessary dict lookups
+    * Load from file, print string (can save to file)
 * 02/11/16 -- Set up syntax parser for both reactions and reagants.
     * Set up stochastic Simulation child class
 * 02/09/16 -- Set up continuous Simulation child class
